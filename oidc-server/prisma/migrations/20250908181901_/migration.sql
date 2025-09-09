@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Tokens" ALTER COLUMN "grantId" SET DEFAULT '',
+ALTER COLUMN "uid" SET DEFAULT '',
+ALTER COLUMN "userCode" SET DEFAULT '';

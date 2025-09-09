@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Tokens" ALTER COLUMN "grantId" SET DATA TYPE TEXT;

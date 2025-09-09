@@ -1,0 +1,29 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Client {
+  id                       Int      @id @default(autoincrement())
+  clientId                 String   @unique
+  clientSecret             String?
+  grantTypes               String[]
+  redirectUris             String[]
+  responseTypes            String[]
+  tokenEndpointAuthMethod  String   @default("client_secret_basic")
+}
+
+model Tokens {
+  id        String   @id
+  data      Json
+  grantId  String @default("")
+  userCode String @default("")
+  tipo      String
+  uid String @default("")
+  expiresAt DateTime?
+}
+
