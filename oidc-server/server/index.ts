@@ -1,7 +1,8 @@
 import express from 'express';
 import 'dotenv/config';
 import oidcConfig from './oidc.js';
-
+import api, { apiData } from './api.js';
+import cors from 'cors'
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 
   function setNoCache(req, res, next) {
@@ -13,13 +14,18 @@ const oidc = await oidcConfig()
 const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-
+app.use(cors({
+  credentials: true,
+  origin: ['http://localhost:3000']
+}))
 app.get('/', (req, res) => res.send('OIDC Provider (Prisma + Redis cache POC)'));
 
 app.get('/interaction/:uid', setNoCache, async (req, res) => {
   const { uid } = req.params;
 
   const { prompt, params } = await oidc.interactionDetails(req, res)
+  console.log('init params', params)
+
   const renderSwitch = {
     'login': loginForm(req),
     'consent': consentForm({
@@ -38,39 +44,39 @@ app.post('/interaction/:uid/login', setNoCache, express.urlencoded({ extended: t
     const { uid } = req.params;
 
     // Busca os detalhes da interação
-    const interaction = await oidc.interactionDetails(req, res);
+    const {params} = await oidc.interactionDetails(req, res);
+    console.log('login params', params)
 
     const result = {
       login: { accountId: req.body.username },
     };
-    console.log('oioi', req.body.username)
+    // console.log('oioi', req.body.username)
     await oidc.interactionFinished(req, res, result, { mergeWithLastSubmission: false });
 
   } catch (err) {
-    console.log('Error integractino', err)
+    // console.log('Error integractino', err)
   }
 });
 
 app.post('/interaction/:uid/confirm', setNoCache, async (req, res) => {
   const { uid } = req.params;
   const interaction = await oidc.interactionDetails(req, res);
-  const { prompt, params, grantId } = interaction;
-
+  const { prompt, params, grantId,session } = interaction;
+  console.log('confirm params', params)
   if (prompt.name !== 'consent') throw new Error('prompt must be consent');
 
-  console.log('AccontId recebido', params)
+  console.log('AccontId recebido', interaction)
 
   let grant;
   if (grantId) {
     grant = await oidc.Grant.find(grantId);
   } else {
     grant = new oidc.Grant({
-      accountId: params.accountId as string,
+      accountId: session?.accountId as string,
       clientId: params.client_id as string
     });
   }
 
-  // Adiciona scopes e claims faltantes
   grant.addOIDCScope(prompt.details.missingOIDCScope || []);
   grant.addOIDCClaims(prompt.details.missingOIDCClaims || []);
   Object.entries(prompt.details.missingResourceScopes || {}).forEach(([indicator, scopes]) => {
@@ -79,12 +85,12 @@ app.post('/interaction/:uid/confirm', setNoCache, async (req, res) => {
 
   const newGrantId = await grant.save();
   const result = { consent: { grantId: newGrantId } };
-  console.log(result)
+  // console.log(result)
   await oidc.interactionFinished(req, res, result, { mergeWithLastSubmission: true });
 });
 
 
-import('./api.js').then(mod => app.use('/api', mod.default));
+app.use('/api/data', (req, res) => apiData(req, res));
 app.use(oidc.callback());
 app.set('trust proxy', true);
 

@@ -39,7 +39,7 @@ export class PrismaAdapter implements Adapter {
 
     const payload = JSON.parse(found.data as string);
     // log de debug pra ver o que está sendo retornado
-    console.log(`[Adapter.find:${this.name}]`, payload);
+    // console.log(`[Adapter.find:${this.name}]`, payload);
 
     return payload;
   }
@@ -69,7 +69,7 @@ export class PrismaAdapter implements Adapter {
     if (!record) return undefined;
 
     const payload = JSON.parse(record.data as string);
-    console.log(`[Adapter.findByUid:${this.name}]`, payload);
+    // console.log(`[Adapter.findByUid:${this.name}]`, payload);
 
     return payload;
   }
@@ -82,7 +82,7 @@ export class PrismaAdapter implements Adapter {
     if (!record) return undefined;
 
     const payload = JSON.parse(record.data as string);
-    console.log(`[Adapter.findByUserCode:${this.name}]`, payload);
+    // console.log(`[Adapter.findByUserCode:${this.name}]`, payload);
 
     return payload;
   }

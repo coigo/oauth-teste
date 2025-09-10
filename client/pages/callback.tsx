@@ -33,19 +33,12 @@ export default function Callback() {
             auth: { username: 'confidential-client', password: 'supersecret' }
           });
         }
-
-        console.log(response)
-
-        setInfo(response.data);
+        console.log(response.data)
         localStorage.setItem('access_token', response.data.access_token);
         localStorage.setItem('refresh_token', response.data.refresh_token);
         localStorage.setItem('id_token', response.data.id_token);
+        // window.location.href = 'data'
 
-        // call protected API
-        const apiResp = await axios.get('http://localhost:4000/api/data', {
-          headers: { Authorization: `Bearer ${response.data.access_token}` }
-        });
-        setApiData(apiResp.data);
       } catch (e) {
         setInfo(e.response?.data || e.message);
       }

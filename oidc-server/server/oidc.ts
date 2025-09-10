@@ -14,11 +14,22 @@ export default async () => {
             token_endpoint_auth_method: c.tokenEndpointAuthMethod as ClientAuthMethod,
             response_types: c.responseTypes as ResponseType[]
         }));
-
+        console.log(clients)
     const configuration: Configuration = {
-        
-        findAccount: async (ctx, id) => {
-            console.log('usuarioId', id)
+        clientBasedCORS(ctx, origin, client) {
+            console.log(ctx)
+            console.log(`oi`,origin)
+            console.log(client)
+            if (!origin) return false
+            if (clients.map(c => c.client_id).includes(client.clientId) ) {
+                return [
+                    'http://localhost:3000',
+                ].includes(origin)
+            }
+            return false
+        },
+        findAccount: async (ctx, id) => {   
+            // console.log('usuarioId', id)
             return {
                 accountId: id,
                 claims: (use, scope, claims, rejected) => {
@@ -44,10 +55,21 @@ export default async () => {
                 return `/interaction/${interaction.uid}`;
             }
         },
-        features: { devInteractions: { enabled: false }, rpInitiatedLogout: { enabled: true } },
+        features: { 
+            devInteractions: { 
+                enabled: false 
+            }, 
+            rpInitiatedLogout: { 
+                enabled: true 
+            },
+            
+        },
         cookies: {
             keys: [process.env.COOKIE_KEYS || 'dev-secret-key']
         },
+        ttl: {
+            AccessToken: 60000
+        }
     };
 
     const oidc = new Provider('http://localhost:4000', configuration)
@@ -70,13 +92,7 @@ export default async () => {
         console.error('Grant error:', err);
     });
 
-    oidc.on('authorization.success', (ctx) => {
-        console.log('authorization s log:', ctx);
-    });
-
-    oidc.on('authorization.accepted', (ctx) => {
-        console.log('authorization a log:', ctx);
-    });
+    
 
     return oidc
 }
