@@ -49,7 +49,7 @@ const apiData = async (req: Request, res: Response) => {
     const parts = auth.split(' ');
     if (parts.length !== 2) return res.status(401).json({ error: 'Invalid Authorization' });
     const token = parts[1];
-    console.log('oi', token)
+    // console.log('oi', token)
     const payload = await verifyToken(token);
       req.user = payload;
   

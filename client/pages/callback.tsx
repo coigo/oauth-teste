@@ -33,7 +33,7 @@ export default function Callback() {
             auth: { username: 'confidential-client', password: 'supersecret' }
           });
         }
-        console.log(response.data)
+        // console.log(response.data)
         localStorage.setItem('access_token', response.data.access_token);
         localStorage.setItem('refresh_token', response.data.refresh_token);
         localStorage.setItem('id_token', response.data.id_token);

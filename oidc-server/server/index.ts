@@ -1,112 +1,154 @@
 import express from 'express';
 import 'dotenv/config';
 import oidcConfig from './oidc.js';
-import api, { apiData } from './api.js';
-import cors from 'cors'
+import { apiData } from './api.js';
+import cors from 'cors';
+import { SessionNotFound } from 'oidc-provider/lib/helpers/errors.js';
+import prisma from '../prisma/index.js';
+
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 
-  function setNoCache(req, res, next) {
-    res.set('cache-control', 'no-store');
-    next();
-  }
+function setNoCache(req, res, next) {
+  res.set('cache-control', 'no-store');
+  next();
+}
 
-const oidc = await oidcConfig()
+// helper pra capturar throw em rotas async
+const asyncHandler = fn => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
+
+const oidc = await oidcConfig();
 const app = express();
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(cors({
-  credentials: true,
-  origin: ['http://localhost:3000']
-}))
-app.get('/', (req, res) => res.send('OIDC Provider (Prisma + Redis cache POC)'));
+app.use(
+  cors({
+    credentials: true,
+    origin: ['http://localhost:3000'],
+  }),
+);
 
-app.get('/interaction/:uid', setNoCache, async (req, res) => {
-  const { uid } = req.params;
+app.get('/', (req, res) =>
+  res.send('OIDC Provider (Prisma + Redis cache POC)'),
+);
 
-  const { prompt, params } = await oidc.interactionDetails(req, res)
-  console.log('init params', params)
-
-  const renderSwitch = {
-    'login': loginForm(req),
-    'consent': consentForm({
-      client: params.client_id,
-      details: prompt.details,
-      params,
-      uid
-    }),
-  }
-  res.send(renderSwitch[prompt.name] || 'nao deu certo viu :(');
-});
-
-
-app.post('/interaction/:uid/login', setNoCache, express.urlencoded({ extended: true }), async (req, res, next) => {
-  try {
+app.get(
+  '/interaction/:uid',
+  setNoCache,
+  asyncHandler(async (req, res) => {
+    // se cair aqui, vai pro middleware de erro
+    // console.log('caiu aqui no interaction ')
     const { uid } = req.params;
+    const { prompt, params } = await oidc.interactionDetails(req, res);
+    // console.log('passou do interactionDetails')
+    
+    const renderSwitch = {
+      login: loginForm(req),
+      consent: consentForm({
+        client: params.client_id,
+        details: prompt.details,
+        params,
+        uid,
+      }),
+    };
+    res.send(renderSwitch[prompt.name] || 'nao deu certo viu :(');
+  }),
+);
 
-    // Busca os detalhes da interação
-    const {params} = await oidc.interactionDetails(req, res);
-    console.log('login params', params)
+app.post(
+  '/interaction/:uid/login',
+  setNoCache,
+  express.urlencoded({ extended: true }),
+  asyncHandler(async (req, res) => {
+    const { uid } = req.params;
+    const { params } = await oidc.interactionDetails(req, res);
 
     const result = {
       login: { accountId: req.body.username },
     };
-    // console.log('oioi', req.body.username)
-    await oidc.interactionFinished(req, res, result, { mergeWithLastSubmission: false });
-
-  } catch (err) {
-    // console.log('Error integractino', err)
-  }
-});
-
-app.post('/interaction/:uid/confirm', setNoCache, async (req, res) => {
-  const { uid } = req.params;
-  const interaction = await oidc.interactionDetails(req, res);
-  const { prompt, params, grantId,session } = interaction;
-  console.log('confirm params', params)
-  if (prompt.name !== 'consent') throw new Error('prompt must be consent');
-
-  console.log('AccontId recebido', interaction)
-
-  let grant;
-  if (grantId) {
-    grant = await oidc.Grant.find(grantId);
-  } else {
-    grant = new oidc.Grant({
-      accountId: session?.accountId as string,
-      clientId: params.client_id as string
+    await oidc.interactionFinished(req, res, result, {
+      mergeWithLastSubmission: false,
     });
+  }),
+);
+
+app.post(
+  '/interaction/:uid/confirm',
+  setNoCache,
+  asyncHandler(async (req, res, next) => {
+     try {
+    const { uid } = req.params;
+    const interaction = await oidc.interactionDetails(req, res);
+    const { accountId } = interaction.session!;
+    const clientId = interaction.params.client_id as string;
+
+    // Cria ou pega grant do OIDC
+    const grant = interaction.grantId
+      ? await oidc.Grant.find(interaction.grantId)
+      : new oidc.Grant({ accountId, clientId });
+
+    // Adiciona escopos autorizados
+    const scopes = ['openid', 'profile', 'email'];
+    grant.addOIDCScope(scopes.join(' '));
+
+    // Salva grant no OIDC provider e pega o grantId
+    const grantId = await grant.save();
+    console.log('grantId',grantId)
+    // Salva grant também no banco para reaproveitar no loadExistingGrant
+    await prisma.grant.upsert({
+      where: { accountId_clientId: { accountId, clientId } },
+      update: {
+        scopes,
+        updatedAt: new Date(),
+      },
+      create: {
+        accountId,
+        clientId,
+        scopes,
+      },
+    });
+
+    // Finaliza a interação
+    await oidc.interactionFinished(req, res, { consent: { grantId } });
+  } catch (err) {
+    next(err);
   }
-
-  grant.addOIDCScope(prompt.details.missingOIDCScope || []);
-  grant.addOIDCClaims(prompt.details.missingOIDCClaims || []);
-  Object.entries(prompt.details.missingResourceScopes || {}).forEach(([indicator, scopes]) => {
-    grant.addResourceScope(indicator, scopes);
-  });
-
-  const newGrantId = await grant.save();
-  const result = { consent: { grantId: newGrantId } };
-  // console.log(result)
-  await oidc.interactionFinished(req, res, result, { mergeWithLastSubmission: true });
-});
-
+  }),
+);
 
 app.use('/api/data', (req, res) => apiData(req, res));
+
+// registra o callback do oidc (ele também usa middlewares internos)
 app.use(oidc.callback());
+
+// middleware de erro vem **depois de tudo**
+app.use((err, req, res, next) => {
+  if (err instanceof SessionNotFound) {
+    // console.log('chegou aqui')
+
+    // console.log(req.query)
+    return res.redirect('/auth')
+  }
+  console.error('Erro capturado pelo middleware:', err);
+  res.status(500).json({ error: 'Deu ruim' });
+});
+
 app.set('trust proxy', true);
 
+app.listen(PORT, () =>
+  console.log(`OIDC provider running at http://localhost:${PORT}`),
+);
 
-app.listen(PORT, () => console.log(`OIDC provider running at http://localhost:${PORT}`));
-
-
-const loginForm = (req) => `
-      <h2>Login (POC)</h2>
-      <form method="post" action="/interaction/${req.params.uid}/login">
-        <input name="username" placeholder="usuario" required />
-        <button type="submit">Login</button>
-      </form>`
+const loginForm = req => `
+  <h2>Login (POC)</h2>
+  <form method="post" action="/interaction/${req.params.uid}/login">
+    <input name="username" placeholder="usuario" required />
+    <button type="submit">Login</button>
+  </form>`;
 
 const consentForm = ({ client, details, params, uid }) => {
-  let html = '';
+    let html = '';
 
   // div do logo do cliente
   html += `<div class="login-client-image">`;
@@ -187,4 +229,4 @@ const consentForm = ({ client, details, params, uid }) => {
   `;
 
   return html;
-}
+};

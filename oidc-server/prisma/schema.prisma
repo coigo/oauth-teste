@@ -17,6 +17,17 @@ model Client {
   tokenEndpointAuthMethod  String   @default("client_secret_basic")
 }
 
+model Grant {
+  id        String   @id @default(cuid())
+  accountId String
+  clientId  String
+  scopes    Json     // array de escopos
+  resources Json?    // array de recursos
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([accountId, clientId])
+}
 model Tokens {
   id        String   @id
   data      Json
