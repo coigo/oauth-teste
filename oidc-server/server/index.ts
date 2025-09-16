@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { request } from 'express';
 import 'dotenv/config';
 import oidcConfig from './oidc.js';
 import { apiData } from './api.js';
@@ -19,6 +19,13 @@ const asyncHandler = fn => (req, res, next) =>
 
 const oidc = await oidcConfig();
 const app = express();
+
+app.use((req, res, next) => {
+  if ( req.url.includes('/auth')) {
+    console.log('/AUTH PARAMS: ', req.query )
+  }
+  next()
+})
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -42,7 +49,8 @@ app.get(
     const { uid } = req.params;
     const { prompt, params } = await oidc.interactionDetails(req, res);
     // console.log('passou do interactionDetails')
-    console.log(params)
+    console.log("Interaction REQUEST", req.query)
+    console.log("Interaction PARAMS", params)
     const renderSwitch = {
       login: loginForm(req),
       consent: consentForm({
@@ -108,7 +116,7 @@ app.post(
     });
 
     // Finaliza a interação
-    await oidc.interactionFinished(req, res, { consent: { grantId } });
+    await oidc.interactionFinished(req, res, { consent: { grantId, scope: 'openid email profile offline_access' } });
   } catch (err) {
     next(err);
   }

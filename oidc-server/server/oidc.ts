@@ -17,9 +17,9 @@ export default async () => {
         }));
     console.log(clients)
     const configuration: Configuration = {
-        issueRefreshToken: async (ctx, client, code) => {
-            console.log('weeee', client.grantTypeAllowed('refresh_token')
-                , code.scopes)
+        rotateRefreshToken: true,
+        issueRefreshToken(ctx, client, code) {
+            console.log('AQUI CARALHO', code.scopes)
             return (
                 client.grantTypeAllowed('refresh_token')
                 && code.scopes.has('offline_access')
@@ -71,7 +71,7 @@ export default async () => {
         },
 
         scopes: ['openid', 'profile', 'email', 'offline_access'],
-        claims: { openid: ['sub'], email: ['email'], profile: ['name']},
+        claims: { openid: ['sub'], email: ['email'], profile: ['name'] },
         interactions: {
             url(ctx, interaction) {
                 return `/interaction/${interaction.uid}`;
