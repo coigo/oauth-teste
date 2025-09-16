@@ -27,3 +27,13 @@ model Tokens {
   expiresAt DateTime?
 }
 
+model Grant {
+  id        String  
+  accountId String
+  clientId  String
+  scopes    String   // ex: "openid profile email"
+  claims    String?  // JSON string
+  createdAt DateTime @default(now())
+
+  @@id([accountId, clientId])
+}

@@ -16,6 +16,7 @@ export default function Callback() {
       try {
         let response;
         if (pkce) {
+          console.log('foi como pkce')
           const code_verifier = localStorage.getItem('code_verifier');
           response = await axios.post('http://localhost:4000/token', new URLSearchParams({
             grant_type: 'authorization_code',
@@ -25,6 +26,7 @@ export default function Callback() {
             code_verifier: code_verifier as string
           }));
         } else {
+          console.log('foi normal')
           response = await axios.post('http://localhost:4000/token', new URLSearchParams({
             grant_type: 'authorization_code',
             code,

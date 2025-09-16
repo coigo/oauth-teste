@@ -31,12 +31,12 @@ export class PrismaAdapter implements Adapter {
   }
 
   async find(id: string) {
+    console.log('id find: ', id)
     const found = await prisma.tokens.findFirst({
       where: { id, tipo: this.name },
     });
 
     if (!found) return undefined;
-
     const payload = JSON.parse(found.data as string);
     // log de debug pra ver o que está sendo retornado
     // console.log(`[Adapter.find:${this.name}]`, payload);

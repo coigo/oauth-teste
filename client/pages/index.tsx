@@ -50,11 +50,23 @@ export default function Home() {
     window.location.href = `${OIDC_URL}/auth?${params}`;
   };
 
+  const refresh = () => {
+    const params = queryString.stringify({
+      client_id: 'confidential-client',
+      response_type: 'code',
+      scope: 'openid profile email offline_access',
+      redirect_uri: 'http://localhost:3000/callback',
+      grant_type: 'refresh_token '
+    });
+    window.location.href = `${OIDC_URL}/auth?${params}`;
+  };
+
   return (
     <div style={{ padding: '2rem' }}>
       <h1>Login POC OAuth2/OpenID Connect</h1>
       <button onClick={loginPKCE} style={{ marginRight: '1rem' }}>Login PKCE</button>
       <button onClick={loginConfidential}>Login Confidencial</button>
+      <button onClick={refresh}>Refresh</button>
     </div>
   );
 }
